@@ -43,12 +43,6 @@ export function createRenderer(container) {
         antialias: true,
     })
 
-    // 设置 Canvas 绘制尺寸。
-    renderer.setSize(
-        window.innerWidth,
-        window.innerHeight,
-    )
-
     // renderer.domElement 是渲染器创建的 Canvas。
     container.appendChild(renderer.domElement)
 

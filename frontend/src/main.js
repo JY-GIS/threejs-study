@@ -1,3 +1,5 @@
+import './style.css'
+
 import {
   createAxesHelper,
   createCamera,
@@ -28,6 +30,9 @@ import {
 import {
   loadGLTFModel,
 } from './topics/08-gltf-loader.js'
+import {
+  setupResponsiveCanvas,
+} from './topics/09-responsive-canvas.js'
 
 // ==================== 1. Scene、Camera、Renderer ====================
 
@@ -40,6 +45,12 @@ const camera = createCamera()
 
 const renderer = createRenderer(
   document.querySelector('#app'),
+)
+
+// 同步 Canvas 尺寸与相机宽高比，并监听窗口变化。
+setupResponsiveCanvas(
+  camera,
+  renderer,
 )
 
 // ==================== 5. 光源 ====================
@@ -84,7 +95,7 @@ configureShadows({
 
 loadGLTFModel('/models/Box.glb', scene)
 
-// ==================== 8. OrbitControls ====================
+// ==================== 4. OrbitControls ====================
 
 const controls = createOrbitControls(
   camera,
