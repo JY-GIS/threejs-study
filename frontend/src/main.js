@@ -36,6 +36,12 @@ import {
 import {
   setupPicking,
 } from './topics/10-raycaster.js'
+import {
+  printObjectTree,
+} from './topics/11-object3d-hierarchy.js'
+import {
+  updateWheelRotation,
+} from './topics/12-wheel-animation.js'
 
 // ==================== 1. Scene、Camera、Renderer ====================
 
@@ -122,22 +128,54 @@ configureShadows({
 // true 表示当前场景仍然需要接收异步加载结果。
 let sceneIsActive = true
 
+// 模型是异步加载的。
+// 动画循环启动时这个数组为空，加载完成后再放入车轮节点。
+const truckWheels = []
+
 loadGLTFModel(
-  '/models/Box.glb',
+  '/models/CesiumMilkTruck.glb',
   scene,
 
   (model) => {
+    model.scale.setScalar(0.5)
+
     // 将业务信息放到模型根对象上。
     model.userData.info = {
       id: 'model-001',
-      name: 'Box 模型',
-      category: 'GLB 模型',
+      name: 'Cesium 牛奶车',
+      category: '多层级 GLB 模型',
     }
 
-    // push() 修改的是现有数组。
-    // 拾取函数持有同一个数组，因此后续点击可以检测到模型。
+    // 从模型根节点开始，递归输出完整场景树。
+    printObjectTree(model)
+
+    // getObjectByName() 会从 model 开始递归查找后代。
+    const wheels = model.getObjectByName('Wheels')
+    const secondWheels = model.getObjectByName('Wheels001')
+    const truckBody = model.getObjectByName('Cesium_Milk_Truck')
+
+    // getObjectByName() 找不到对象时会返回 undefined。
+    // 只有查找成功才放入动画数组。
+    if (wheels) {
+      truckWheels.push(wheels)
+    }
+    if (secondWheels) {
+      truckWheels.push(secondWheels)
+    }
+    console.log(`找到 ${truckWheels.length} 组车轮节点`)
+
+    console.log('车身节点：', truckBody)
+    console.log('第一组车轮：', wheels)
+    console.log('第二组车轮：', secondWheels)
+
+    // parent 只表示直接父节点。
+    console.log('第一组车轮的直接父节点：', wheels?.parent)
+    console.log('第一组车轮的上两级节点：', wheels?.parent?.parent)
+
+    // 将模型根节点登记为一个可拾取整体。
     pickableObjects.push(model)
-    console.log('模型已加入拾取列表')
+
+    console.log('牛奶车已加入拾取列表')
   },
 
   // 加载完成时调用这个函数，读取 sceneIsActive 的最新值。
@@ -158,9 +196,15 @@ const stopAnimationLoop = startAnimationLoop({
   scene,
   camera,
 
-  // deltaTime 由动画模块提供，单位为秒。
   onUpdate(deltaTime) {
+    // 原有立方体动画。
     updateCubeRotation(cube, deltaTime)
+
+    // 更新牛奶车的两组车轮。
+    updateWheelRotation(
+      truckWheels,
+      deltaTime,
+    )
   },
 })
 
