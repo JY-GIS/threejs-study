@@ -37,3 +37,26 @@ canvas {
   /* 鼠标事件穿过面板，继续交给下方 Canvas。 */
   pointer-events: none;
 }
+
+/* 固定在左下角的场景销毁按钮。 */
+#destroy-scene-button {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+
+  padding: 10px 16px;
+  color: white;
+  background: #c62828;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#destroy-scene-button:hover:not(:disabled) {
+  background: #e53935;
+}
+
+#destroy-scene-button:disabled {
+  background: #666;
+  cursor: default;
+}

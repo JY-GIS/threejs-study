@@ -1,4 +1,5 @@
 import './style.css'
+import * as THREE from 'three'
 
 import {
   createAxesHelper,
@@ -42,6 +43,22 @@ import {
 import {
   updateWheelRotation,
 } from './topics/12-wheel-animation.js'
+import {
+  logObjectCoordinates,
+  logPointConversion,
+} from './topics/13-coordinate-space.js'
+import {
+  setupKeyboardMovement,
+} from './topics/14-keyboard-movement.js'
+import {
+  updateCameraFollow,
+} from './topics/15-camera-follow.js'
+import {
+  setupCameraMode,
+} from './topics/16-camera-mode.js'
+import {
+  disposeObjectTrees,
+} from './topics/17-scene-disposal.js'
 
 // ==================== 1. Scene、Camera、Renderer ====================
 
@@ -128,6 +145,9 @@ configureShadows({
 // true 表示当前场景仍然需要接收异步加载结果。
 let sceneIsActive = true
 
+// 模型加载完成前为 null。
+let truckModel = null
+
 // 模型是异步加载的。
 // 动画循环启动时这个数组为空，加载完成后再放入车轮节点。
 const truckWheels = []
@@ -137,6 +157,9 @@ loadGLTFModel(
   scene,
 
   (model) => {
+    // 保存模型根节点，供动画循环和键盘控制使用。
+    truckModel = model
+
     model.scale.setScalar(0.5)
 
     // 将业务信息放到模型根对象上。
@@ -158,9 +181,17 @@ loadGLTFModel(
     // 只有查找成功才放入动画数组。
     if (wheels) {
       truckWheels.push(wheels)
+      logObjectCoordinates(wheels, '第一组车轮')
+
+      // 车轮局部坐标中的一个点。
+      // 它位于车轮自身原点沿局部 X 轴 0.4 个单位的位置。
+      const localWheelPoint = new THREE.Vector3(0.4, 0, 0)
+
+      logPointConversion(wheels, localWheelPoint, '第一组车轮表面点')
     }
     if (secondWheels) {
       truckWheels.push(secondWheels)
+      logObjectCoordinates(secondWheels, '第二组车轮')
     }
     console.log(`找到 ${truckWheels.length} 组车轮节点`)
 
@@ -189,6 +220,21 @@ const controls = createOrbitControls(
   renderer.domElement,
 )
 
+const {
+  updateMovement,
+  disposeKeyboardMovement,
+} = setupKeyboardMovement()
+
+const {
+  isFollowMode,
+  disposeCameraMode,
+} = setupCameraMode(
+  controls,
+
+  // 这里必须传函数，而不是直接传 truckModel。调用时会读取异步加载完成后的最新值。
+  () => truckModel,
+)
+
 // ==================== 6. 动画循环 ====================
 
 const stopAnimationLoop = startAnimationLoop({
@@ -205,40 +251,70 @@ const stopAnimationLoop = startAnimationLoop({
       truckWheels,
       deltaTime,
     )
+
+    // 先移动汽车。
+    updateMovement(
+      truckModel,
+      deltaTime,
+    )
+
+    if (isFollowMode()) {
+      updateCameraFollow(
+        camera,
+        truckModel,
+      )
+    }
   },
 })
 
-// 停止当前场景的持续渲染和用户交互。
-function stopSceneActivity() {
+const destroyButton = document.querySelector('#destroy-scene-button')
+const infoPanel = document.querySelector('#info-panel')
+
+// 点击按钮后彻底停止并销毁当前 Three.js 场景。
+function destroyScene() {
+  // 防止重复执行销毁逻辑。
+  if (!sceneIsActive) return
+
   // 不再接收迟到的 GLB 加载结果。
   sceneIsActive = false
 
-  // 停止持续渲染和各项事件监听。
+  // 第一层：停止会持续运行的动画和全部事件监听。
   stopAnimationLoop()
   disposePicking()
   disposeResponsiveCanvas()
+  disposeCameraMode()
+  disposeKeyboardMovement()
   controls.dispose()
+  destroyButton.removeEventListener('click', destroyScene)
 
-  // 1. 从场景中移除，后续帧不再绘制这个立方体。
-  scene.remove(cube)
-  // 2. 从拾取列表中移除，避免射线继续检测它。
-  const index = pickableObjects.indexOf(cube)
-  if (index !== -1) {
-    pickableObjects.splice(index, 1)
-  }
-  // 3. 释放当前立方体独占的渲染资源。
-  cube.geometry.dispose()
-  cube.material.dispose()
-  colorTexture.dispose()
+  // 第二层：递归释放场景对象持有的 Geometry、Material 和 Texture。
+  // cube 的 colorTexture 会从 cube.material.map 中找到，无需再次手动 dispose。
+  const disposedResources = disposeObjectTrees([
+    axesHelper,
+    cube,
+    floor,
+    truckModel,
+  ])
 
-  // 虽然动画循环已经停止，但仍可以手动渲染一次。
-  // 此时 cube 已不在 scene 中，所以新画面不会包含它。
-  renderer.render(scene, camera)
+  // 清空仍然保存 Object3D 引用的业务数组和变量。
+  pickableObjects.length = 0
+  truckWheels.length = 0
+  truckModel = null
 
-  console.log('场景交互已停止，立方体资源已请求释放')
+  // 清除剩余的灯光等节点，并解除背景颜色引用。
+  scene.clear()
+  scene.background = null
+
+  // 第三层：释放渲染器内部资源，并移除它创建的 Canvas。
+  renderer.dispose()
+  renderer.domElement.remove()
+
+  // 按钮保留在页面上，用来显示最终状态，但已经不能再次点击。
+  destroyButton.disabled = true
+  destroyButton.textContent = '场景已销毁'
+  infoPanel.textContent = '动画、事件、场景资源和 Canvas 已全部销毁'
+
+  console.log('已释放的场景资源：', disposedResources)
 }
 
-// // 仅用于实验：10 秒后停止场景交互。
-// setTimeout(() => {
-//   stopSceneActivity()
-// }, 10000)
+destroyButton.addEventListener('click', destroyScene)
