@@ -8,8 +8,16 @@ export function startAnimationLoop({
 }) {
     let previousTime
 
+    // 保存最近一次申请动画帧时返回的编号。
+    let animationFrameId
+
+    // 记录循环是否已经停止。
+    let stopped = false
+
     // 浏览器调用时传入 currentTime，单位为毫秒。
     function animate(currentTime) {
+        if (stopped) return
+
         // 第一帧还没有上一帧，让时间差为 0。
         if (previousTime === undefined) {
             previousTime = currentTime
@@ -23,10 +31,18 @@ export function startAnimationLoop({
         onUpdate(deltaTime)
         renderer.render(scene, camera)
 
-        // 再申请下一帧。
-        requestAnimationFrame(animate)
+        // onUpdate 可能触发停止操作；停止后不再申请下一帧。
+        if (!stopped) {
+            animationFrameId = requestAnimationFrame(animate)
+        }
     }
 
-    // 申请第一帧，启动循环。
-    requestAnimationFrame(animate)
+    // 启动第一帧，并保存返回的请求编号。
+    animationFrameId = requestAnimationFrame(animate)
+
+    // 返回停止函数，交给调用方在适当的时候使用。
+    return function stopAnimationLoop() {
+        stopped = true
+        cancelAnimationFrame(animationFrameId)
+    }
 }

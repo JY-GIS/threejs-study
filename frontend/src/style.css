@@ -19,3 +19,21 @@ body {
 canvas {
   display: block;
 }
+
+/* 固定在页面左上角的信息面板。 */
+#info-panel {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+
+  padding: 12px;
+  color: white;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 6px;
+
+  /* 保留文本中的换行符。 */
+  white-space: pre-line;
+
+  /* 鼠标事件穿过面板，继续交给下方 Canvas。 */
+  pointer-events: none;
+}

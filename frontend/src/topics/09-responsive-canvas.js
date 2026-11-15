@@ -43,4 +43,10 @@ export function setupResponsiveCanvas(
     // 页面首次加载时主动执行一次，
     // 不必等到用户第一次调整窗口。
     handleResize()
+
+    // 返回清理函数。
+    // 移除时传入注册监听时使用的同一个 handleResize 函数。
+    return function disposeResponsiveCanvas() {
+        window.removeEventListener('resize', handleResize)
+    }
 }
